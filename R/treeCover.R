@@ -74,6 +74,43 @@ linearModel <- function(GewataBrick) {
 ###Which predictors (bands) are probably most important in predicting tree cover?
 #(3)#plot the predicted tree cover raster and compare with the original VCF raster.
 #(4)#compute the RMSE between your predicted and the actual tree cover values (hint )
+
+
+
+# Calculate the RMSE ------------------------------------------------------
+RMSE <- function (actualTreeCover, predictedTreeCover) {
+  RMSE <- sqrt(mean((actualTreeCover-predictedTreeCover)^2))
+  return (RMSE)
+}
+
+# Calculate the RMSE for the actual and predicted VCF and the different classes
+RMSEclasses <- function(VCF_covs) {
+   # Load the training polygons
+   load("data/trainingPoly.rda")
+   
+   # Convert training polygon classes into integers
+   trainingPoly@data$Code <- as.numeric(trainingPoly@data$Class)
+   
+   # View the training polygon data
+   trainingPoly@data
+   
+   # Give raster cells a 'code' value
+   classes <- rasterize(trainingPoly, VCF_covs, field='Code')
+   
+   # Create a new rasterbrick for calculations
+   VCF <- brick(VCF_covs, predictedVCF)
+   
+   # Calculate the mean of each zone
+   VCF_zonal <- zonal(VCF, classes, fun = 'mean', digits = 1, na.rm = TRUE)
+   VCFdf <- as.data.frame(VCF_zonal)
+   # Calculate the Root mean squared Error for all of the 3 classes
+   RMSE_classes <- RMSE(VCFdf$vcf, VCFdf$predictedVCF) # kan dit zo terugroepen naar deRMSE functie hierboven?
+   names(RMSE_classes) <- c("Crop", "Forest", "Wetlands")
+   return (RMSE_classes)
+}
+   
+
+
 #(5)#are the differences between the predicted and actual tree cover the same for all of the 3 classes we used for 
 ###the random forest classfication? Using the training polygons from the random forest classification, 
 ###calculate the RMSE separately for each of the classes and compare. Hint - see ?zonal().
