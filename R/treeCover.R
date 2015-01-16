@@ -86,6 +86,7 @@ linearModel <- function(GewataBrick) {
   return(VCFlist)
 }
 
+<<<<<<< HEAD
 # Calculate the RMSE for the actual and predicted VCF and the different classes
 calculateDifference <- function(VCFlist) {
   # Load the training polygons
@@ -113,3 +114,59 @@ calculateDifference <- function(VCFlist) {
   names(RMSEclasses) <- c("Crop", "Forest", "Wetlands")
   return(RMSEclasses)
 }
+=======
+# function 
+#create training table with names same as raster layers in input brick
+
+#Done
+
+#(1)#produce one or more plots that demonstrate the relationship between the Landsat bands and the VCF tree cover. 
+###What can you conclude from this/these plot(s)?
+#(2)#create an lm() model and show a summary (e.g. using summary()) of the model object you created.
+
+#To Do
+#(2)
+###Which predictors (bands) are probably most important in predicting tree cover?
+#(3)#plot the predicted tree cover raster and compare with the original VCF raster.
+#(4)#compute the RMSE between your predicted and the actual tree cover values (hint )
+
+
+
+# Calculate the RMSE ------------------------------------------------------
+RMSE <- function (actualTreeCover, predictedTreeCover) {
+  RMSE <- sqrt(mean((actualTreeCover-predictedTreeCover)^2))
+  return (RMSE)
+}
+
+# Calculate the RMSE for the actual and predicted VCF and the different classes
+RMSEclasses <- function(VCF_covs) {
+   # Load the training polygons
+   load("data/trainingPoly.rda")
+   
+   # Convert training polygon classes into integers
+   trainingPoly@data$Code <- as.numeric(trainingPoly@data$Class)
+   
+   # View the training polygon data
+   trainingPoly@data
+   
+   # Give raster cells a 'code' value
+   classes <- rasterize(trainingPoly, VCF_covs, field='Code')
+   
+   # Create a new rasterbrick for calculations
+   VCF <- brick(VCF_covs, predictedVCF)
+   
+   # Calculate the mean of each zone
+   VCF_zonal <- zonal(VCF, classes, fun = 'mean', digits = 1, na.rm = TRUE)
+   VCFdf <- as.data.frame(VCF_zonal)
+   # Calculate the Root mean squared Error for all of the 3 classes
+   RMSE_classes <- RMSE(VCFdf$vcf, VCFdf$predictedVCF) # kan dit zo terugroepen naar deRMSE functie hierboven?
+   names(RMSE_classes) <- c("Crop", "Forest", "Wetlands")
+   return (RMSE_classes)
+}
+   
+
+
+#(5)#are the differences between the predicted and actual tree cover the same for all of the 3 classes we used for 
+###the random forest classfication? Using the training polygons from the random forest classification, 
+###calculate the RMSE separately for each of the classes and compare. Hint - see ?zonal().
+>>>>>>> a738b97f10a4b09d371718e29e83762a64a7a195
