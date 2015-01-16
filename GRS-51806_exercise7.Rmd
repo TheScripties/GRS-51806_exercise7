@@ -1,0 +1,185 @@
+---
+title: "Advanced Raster Analysis"
+author: "TheScripties"
+date: "Friday, January 16, 2015"
+output: html_document
+---
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+# Load libraries
+library(sp)
+library(raster)
+```
+
+```{r}
+# Load data
+load("data/GewataB1.rda")
+load("data/GewataB2.rda")
+load("data/GewataB3.rda")
+load("data/GewataB4.rda")
+load("data/GewataB5.rda")
+load("data/GewataB7.rda")
+load("data/vcfGewata.rda")
+```
+
+```{r}
+# To remove values greater than 100
+vcfGewata[vcfGewata > 100] <- NA
+plot(vcfGewata, main = "VCF")
+```
+
+```{r}
+summary(vcfGewata)
+```
+
+```{r}
+# Create a multi-layer raster object using the brick function
+GewataBrick <- brick(GewataB1, GewataB2, GewataB3, GewataB4, GewataB5, GewataB7, vcfGewata)
+```  
+
+```{r}
+pairs(GewataBrick)
+```
+
+```{r}
+# Rescale the original reflectance values to their original scale
+GewataBands <- calc(GewataBrick[[1:6]], fun = function(x) x / 10000)
+  
+# Make a new raster brick of covariates by adding VCF layer
+GewataCovs <- addLayer(GewataBands, GewataBrick[[7]])
+names(GewataCovs) <- c("band1", "band2", "band3", "band4", "band5", "band7", "VCF")
+```
+
+```{r}
+# Extract all values into a matrix
+valuetable <- getValues(GewataCovs)
+  
+# Remove the NA-values
+valuetable <- na.omit(valuetable)
+valuetable <- as.data.frame(valuetable)
+```
+
+```{r}
+# Make a linear model of the original VCF and the Landsat bands (raster layers)
+GewataLM <- lm(formula = VCF ~ band2 + band3 + band5, data = valuetable)
+summary(GewataLM)
+```
+
+```{r}
+# Predict the tree cover using the linear model
+predictTC <- predict(GewataCovs, model = GewataLM, na.rm = TRUE)
+  
+predictTC[predictTC < 0] <- 0
+```
+
+```{r}
+# Plot the predicted tree cover raster and compare it with the original VCF raster
+opar <- par(mfrow = c(1, 2))
+plot(predictTC, main = "Predicted VCF")
+plot(GewataBrick[[7]], main = "Original VCF")
+par(opar)
+```
+
+```{r}
+# Calculate the RMSE between predicted and actual tree cover values
+Rows <- predictTC@nrows
+Cols <- predictTC@ncols
+RMSE <- sqrt(mean((GewataCovs$VCF[Rows, Cols] - predictTC[Rows, Cols])^2))
+```  
+
+```{r}
+# Create a vector to return
+VCFlist <- c("actual" = GewataCovs$VCF, "predict" = predictTC)
+```
+
+```{r}
+# Load the training polygons
+load("data/trainingPoly.rda")
+
+# Convert training polygon classes into integers
+trainingPoly@data$Code <- as.numeric(trainingPoly@data$Class)
+
+# View the training polygon data
+trainingPoly@data
+```
+
+```{r}
+# Give raster cells a 'code' value
+classes <- rasterize(trainingPoly, VCFlist$actual, field = 'Code')
+
+# Create a new rasterbrick for calculations
+VCF <- brick(VCFlist$actual, VCFlist$predict)
+
+# Calculate the mean of each zone
+VCFzonal <- zonal(VCF, classes, fun = 'mean', digits = 1, na.rm = TRUE)
+VCFdf <- as.data.frame(VCFzonal)
+```
+
+```{r}
+# Calculate the Root mean squared Error for all of the 3 classes
+RMSEclasses <- sqrt((VCFdf$VCF - VCFdf$layer)^2)
+names(RMSEclasses) <- c("Crop", "Forest", "Wetlands")
+```
+
+<h1>
+ <font color = "teal"> 
+  Answers to the questions from the exercise 
+ </font>
+</h1>
+
+<h3> 
+ <font color = "green"> 
+  Question 1 
+ </font> 
+</h3>
+
+<h4> 
+ <font color = "green"> 
+  What can you conclude from this/these plot(s)?
+ </font> 
+</h4>
+
+There is a negative correlation between the reflectance of all Landsat ETM+ bands, except for band 4, and the Vegetation Continuous Field (VCF). <br>
+All the plots indicate that a decrease in reflection results in an increase in VCF.
+
+<h3> 
+ <font color = "green"> 
+  Question 2 
+ </font> 
+</h3>
+
+<h4> 
+ <font color = "green"> 
+  Which predictors (bands) are probably most important in predicting tree cover?
+ </font> 
+</h4>
+
+The bands that are probably the most important in predicting tree cover are band 2, 3 and 5. The RMSE is 1.6189.  <br>
+NB: the `sample()` function can be used to generate all the band combinations to assess the lowest RMSE. E.g.  <br>
+`bands <- c("band1", "band2", "band3", "band4", "band5", "band7")` <br>
+`sample(bands, count = 3)`
+
+
+<h3> 
+ <font color = "green"> 
+  Question 3 
+ </font> 
+</h3>>
+
+<h4> 
+ <font color = "green"> 
+  Are the differences between the predicted and actual tree cover the same for all of the 3 classes we used for the random forest classfication?
+ </font> 
+</h4>
+
+The differences between the predicted and actual classes are not the same.  <br>
+The RMSE per zone is 5.148 for Crop, 2.185 for Forest and 4.761 for Wetlands.
+     
+<h5>
+ <a href = "https://github.com/TheScripties/GRS-51806_exercise7.git" link = "teal" alink = "teal" vlink = "teal"> 
+  The link to our clone Git repository. 
+ </a>
+</h5>
